@@ -1,5 +1,5 @@
 //@version=5
-indicator("session ranges", overlay=true, max_lines_count=500, max_labels_count=500)
+indicator("session ranges", overlay=true, max_lines_count=500, max_labels_count=500, display=display.all)
 
 // ===== INPUT SETTINGS =====
 // General Settings
@@ -227,7 +227,7 @@ if enable_alerts
 // plotchar(lines_drawn_date, "Lines Drawn Date", "", location.top)
 // plotchar(current_date, "Current Date", "", location.top)
 
-// Debug flags
-plotchar(show_debug ? (in_range ? 1 : 0) : na, "in_range", "", location.top)
-plotchar(show_debug ? (session_started ? 1 : 0) : na, "session_started", "", location.top)
-plotchar(show_debug ? (session_ended ? 1 : 0) : na, "session_ended", "", location.top)
+// Debug flags (commented out to prevent separate lane)
+// plotchar(show_debug ? (in_range ? 1 : 0) : na, "in_range", "", location.top)
+// plotchar(show_debug ? (session_started ? 1 : 0) : na, "session_started", "", location.top)
+// plotchar(show_debug ? (session_ended ? 1 : 0) : na, "session_ended", "", location.top)
