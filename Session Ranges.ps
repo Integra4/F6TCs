@@ -1,0 +1,222 @@
+//@version=5
+indicator("Session F6TCs", overlay=true, max_lines_count=500, max_labels_count=500)
+
+// ===== INPUT SETTINGS =====
+// General Settings
+var string g_general = "General Settings"
+indicator_name = input.string("Session F6TCs", "Indicator Name", group=g_general)
+
+// Time Settings
+var string g_time = "Time Settings"
+timezone = input.string("America/New_York", "Timezone", options=["America/New_York", "America/Chicago", "America/Denver", "America/Los_Angeles", "UTC"], group=g_time)
+
+// Session Preset (AM/PM)
+session_mode = input.string("AM", "Session Mode", options=["AM", "PM"], group=g_time)
+
+// AM Session Window (used when Session Mode = AM)
+am_start_hour = input.int(7, "AM Start Hour (EST)", minval=0, maxval=23, group=g_time)
+am_start_minute = input.int(30, "AM Start Minute", minval=0, maxval=59, group=g_time)
+am_end_hour = input.int(7, "AM End Hour (EST)", minval=0, maxval=23, group=g_time)
+am_end_minute = input.int(35, "AM End Minute", minval=0, maxval=59, group=g_time)
+
+// PM Session Window (used when Session Mode = PM)
+pm_start_hour = input.int(13, "PM Start Hour (EST)", minval=0, maxval=23, group=g_time)
+pm_start_minute = input.int(30, "PM Start Minute", minval=0, maxval=59, group=g_time)
+pm_end_hour = input.int(13, "PM End Hour (EST)", minval=0, maxval=23, group=g_time)
+pm_end_minute = input.int(35, "PM End Minute", minval=0, maxval=59, group=g_time)
+
+// Effective window derived from Session Mode
+effective_start_hour = session_mode == "AM" ? am_start_hour : pm_start_hour
+effective_start_minute = session_mode == "AM" ? am_start_minute : pm_start_minute
+effective_end_hour = session_mode == "AM" ? am_end_hour : pm_end_hour
+effective_end_minute = session_mode == "AM" ? am_end_minute : pm_end_minute
+
+// Line Style Settings
+var string g_lines = "Line Style Settings"
+show_range_lines = input.bool(true, "Show Range Lines (High/Low)", group=g_lines)
+show_quadrant_lines = input.bool(true, "Show Quadrant Lines (25%, 50%, 75%)", group=g_lines)
+line_width = input.int(2, "Line Width", minval=1, maxval=5, group=g_lines)
+quadrant_line_width = input.int(1, "Quadrant Line Width", minval=1, maxval=5, group=g_lines)
+extend_lines = input.bool(true, "Extend Lines to Right", group=g_lines)
+
+// Color Settings
+var string g_colors = "Color Settings"
+range_high_color = input.color(color.rgb(0, 0, 0), "Range High Color", group=g_colors)
+range_low_color = input.color(color.rgb(0, 0, 0), "Range Low Color", group=g_colors)
+q25_color = input.color(#5b9cf6, "25% Quadrant Color", group=g_colors)
+q50_color = input.color(color.orange, "50% Quadrant Color", group=g_colors)
+q75_color = input.color(#5b9cf6, "75% Quadrant Color", group=g_colors)
+
+// Display Settings
+var string g_display = "Display Settings"
+show_labels = input.bool(true, "Show Price Labels", group=g_display)
+label_size = input.string("small", "Label Size", options=["tiny", "small", "normal", "large"], group=g_display)
+label_color = input.color(color.white, "Label Color", group=g_display)
+label_style = input.string("label.style_label_down", "Label Style", options=["label.style_label_down", "label.style_label_up", "label.style_label_left", "label.style_label_right"], group=g_display)
+
+// Alert Settings
+var string g_alerts = "Alert Settings"
+enable_alerts = input.bool(false, "Enable Alerts", group=g_alerts)
+alert_on_range_complete = input.bool(true, "Alert on Range Complete", group=g_alerts)
+alert_on_breakout = input.bool(false, "Alert on Range Breakout", group=g_alerts)
+breakout_threshold = input.float(0.5, "Breakout Threshold (ticks)", minval=0.1, step=0.1, group=g_alerts)
+
+// Performance Settings
+var string g_performance = "Performance Settings"
+max_days_back = input.int(30, "Max Days to Display", minval=1, maxval=365, group=g_performance)
+clear_old_lines = input.bool(true, "Clear Old Lines", group=g_performance)
+
+// ===== CORE LOGIC =====
+// Define the time range
+start_time = timestamp(timezone, year, month, dayofmonth, effective_start_hour, effective_start_minute, 0)
+end_time = timestamp(timezone, year, month, dayofmonth, effective_end_hour, effective_end_minute, 0)
+
+// Check if current bar is within the time range
+in_range = time >= start_time and time <= end_time
+
+// Variables to track high and low during the range
+var float range_high = na
+var float range_low = na
+var bool range_completed = false
+var int start_bar_index = na
+var bool lines_drawn = false
+var line[] range_lines = array.new_line()
+var label[] range_labels = array.new_label()
+
+// Track each set of lines with their creation dates
+var int[] line_dates = array.new_int()
+var int[] label_dates = array.new_int()
+
+// Reset at the start of each day
+if dayofmonth != dayofmonth[1]
+    range_high := na
+    range_low := na
+    range_completed := false
+    start_bar_index := na
+    lines_drawn := false
+    
+    // Clean up old lines and labels based on max_days_back setting
+    if clear_old_lines
+        current_date = timestamp(timezone, year, month, dayofmonth, 0, 0, 0)
+        
+        // Clean up old lines
+        if array.size(range_lines) > 0
+            for i = array.size(range_lines) - 1 to 0
+                if i < array.size(line_dates)
+                    line_date = array.get(line_dates, i)
+                    days_diff = math.floor((current_date - line_date) / (1000 * 60 * 60 * 24))
+                    
+                    if days_diff > max_days_back
+                        line.delete(array.get(range_lines, i))
+                        array.remove(range_lines, i)
+                        array.remove(line_dates, i)
+        
+        // Clean up old labels
+        if array.size(range_labels) > 0
+            for i = array.size(range_labels) - 1 to 0
+                if i < array.size(label_dates)
+                    label_date = array.get(label_dates, i)
+                    days_diff = math.floor((current_date - label_date) / (1000 * 60 * 60 * 24))
+                    
+                    if days_diff > max_days_back
+                        label.delete(array.get(range_labels, i))
+                        array.remove(range_labels, i)
+                        array.remove(label_dates, i)
+
+// Update high and low during the range
+if in_range
+    if na(range_high) or high > range_high
+        range_high := high
+    if na(range_low) or low < range_low
+        range_low := low
+    if na(start_bar_index)
+        start_bar_index := bar_index
+
+// Mark range as completed after end time
+if time > end_time and not range_completed
+    range_completed := true
+
+// Calculate quadrant levels
+range_size = range_high - range_low
+q25 = range_low + (range_size * 0.25)
+q50 = range_low + (range_size * 0.50)
+q75 = range_low + (range_size * 0.75)
+
+// Draw horizontal rays starting from start time and extending to the right
+if range_completed and not lines_drawn and not na(start_bar_index)
+    // Always use extend.right for proper behavior
+    extend_direction = extend.right
+    
+    // Get current date for tracking
+    current_line_date = timestamp(timezone, year, month, dayofmonth, 0, 0, 0)
+    
+    // Draw range lines
+    if show_range_lines
+        high_line = line.new(start_bar_index, range_high, start_bar_index + 1, range_high, color=range_high_color, width=line_width, extend=extend_direction)
+        low_line = line.new(start_bar_index, range_low, start_bar_index + 1, range_low, color=range_low_color, width=line_width, extend=extend_direction)
+        array.push(range_lines, high_line)
+        array.push(range_lines, low_line)
+        array.push(line_dates, current_line_date)
+        array.push(line_dates, current_line_date)
+    
+    // Draw quadrant lines
+    if show_quadrant_lines
+        q25_line = line.new(start_bar_index, q25, start_bar_index + 1, q25, color=q25_color, width=quadrant_line_width, extend=extend_direction)
+        q50_line = line.new(start_bar_index, q50, start_bar_index + 1, q50, color=q50_color, width=quadrant_line_width, extend=extend_direction)
+        q75_line = line.new(start_bar_index, q75, start_bar_index + 1, q75, color=q75_color, width=quadrant_line_width, extend=extend_direction)
+        array.push(range_lines, q25_line)
+        array.push(range_lines, q50_line)
+        array.push(range_lines, q75_line)
+        array.push(line_dates, current_line_date)
+        array.push(line_dates, current_line_date)
+        array.push(line_dates, current_line_date)
+    
+    // Add labels if enabled
+    if show_labels
+        label_style_enum = label_style == "label.style_label_down" ? label.style_label_down : 
+                           label_style == "label.style_label_up" ? label.style_label_up :
+                           label_style == "label.style_label_left" ? label.style_label_left : label.style_label_right
+        
+        if show_range_lines
+            high_label = label.new(bar_index, range_high, str.tostring(range_high, "#.##"), color=range_high_color, style=label_style_enum, size=label_size, textcolor=label_color)
+            low_label = label.new(bar_index, range_low, str.tostring(range_low, "#.##"), color=range_low_color, style=label_style_enum, size=label_size, textcolor=label_color)
+            array.push(range_labels, high_label)
+            array.push(range_labels, low_label)
+            array.push(label_dates, current_line_date)
+            array.push(label_dates, current_line_date)
+        
+        if show_quadrant_lines
+            q25_label = label.new(bar_index, q25, "25%", color=q25_color, style=label_style_enum, size=label_size, textcolor=label_color)
+            q50_label = label.new(bar_index, q50, "50%", color=q50_color, style=label_style_enum, size=label_size, textcolor=label_color)
+            q75_label = label.new(bar_index, q75, "75%", color=q75_color, style=label_style_enum, size=label_size, textcolor=label_color)
+            array.push(range_labels, q25_label)
+            array.push(range_labels, q50_label)
+            array.push(range_labels, q75_label)
+            array.push(label_dates, current_line_date)
+            array.push(label_dates, current_line_date)
+            array.push(label_dates, current_line_date)
+    
+    lines_drawn := true
+
+// ===== ALERTS =====
+if enable_alerts
+    if alert_on_range_complete and range_completed and not range_completed[1]
+        alert("Range Complete: " + str.tostring(range_low, "#.##") + " - " + str.tostring(range_high, "#.##"), alert.freq_once_per_bar)
+    
+    if alert_on_breakout and range_completed
+        breakout_up = close > range_high + (breakout_threshold * syminfo.mintick)
+        breakout_down = close < range_low - (breakout_threshold * syminfo.mintick)
+        
+        if breakout_up
+            alert("Price broke above range high: " + str.tostring(close, "#.##"), alert.freq_once_per_bar)
+        if breakout_down
+            alert("Price broke below range low: " + str.tostring(close, "#.##"), alert.freq_once_per_bar)
+
+// ===== PLOT SETTINGS =====
+// Debug plotting removed - not needed for main indicator functionality
+
+// ===== DEBUG INFO (Remove after testing) =====
+// Uncomment these lines to see what's happening with dates
+// plotchar(days_diff, "Days Difference", "", location.top)
+// plotchar(lines_drawn_date, "Lines Drawn Date", "", location.top)
+// plotchar(current_date, "Current Date", "", location.top)
