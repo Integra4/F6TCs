@@ -68,11 +68,16 @@ clear_old_lines = input.bool(true, "Clear Old Lines", group=g_performance)
 
 // ===== CORE LOGIC =====
 // Define the time range
-start_time = timestamp(timezone, year, month, dayofmonth, effective_start_hour, effective_start_minute, 0)
-end_time = timestamp(timezone, year, month, dayofmonth, effective_end_hour, effective_end_minute, 0)
+start_time = timestamp(syminfo.timezone, year, month, dayofmonth, effective_start_hour, effective_start_minute, 0)
+end_time = timestamp(syminfo.timezone, year, month, dayofmonth, effective_end_hour, effective_end_minute, 0)
+
+// Validate window: end must be after start (no overnight sessions)
+start_minutes = (effective_start_hour * 60) + effective_start_minute
+end_minutes = (effective_end_hour * 60) + effective_end_minute
+valid_window = end_minutes > start_minutes
 
 // Check if current bar is within the time range
-in_range = time >= start_time and time <= end_time
+in_range = valid_window and time >= start_time and time <= end_time
 
 // Variables to track high and low during the range
 var float range_high = na
@@ -97,7 +102,7 @@ if dayofmonth != dayofmonth[1]
     
     // Clean up old lines and labels based on max_days_back setting
     if clear_old_lines
-        current_date = timestamp(timezone, year, month, dayofmonth, 0, 0, 0)
+        current_date = timestamp(syminfo.timezone, year, month, dayofmonth, 0, 0, 0)
         
         // Clean up old lines
         if array.size(range_lines) > 0
@@ -132,8 +137,8 @@ if in_range
     if na(start_bar_index)
         start_bar_index := bar_index
 
-// Mark range as completed after end time
-if time > end_time and not range_completed
+// Mark range as completed after end time (only if window valid and range observed)
+if valid_window and time > end_time and not range_completed and not na(range_high) and not na(range_low)
     range_completed := true
 
 // Calculate quadrant levels
@@ -143,12 +148,12 @@ q50 = range_low + (range_size * 0.50)
 q75 = range_low + (range_size * 0.75)
 
 // Draw horizontal rays starting from start time and extending to the right
-if range_completed and not lines_drawn and not na(start_bar_index)
+if range_completed and not lines_drawn and not na(start_bar_index) and not na(range_high) and not na(range_low)
     // Always use extend.right for proper behavior
     extend_direction = extend.right
     
     // Get current date for tracking
-    current_line_date = timestamp(timezone, year, month, dayofmonth, 0, 0, 0)
+    current_line_date = timestamp(syminfo.timezone, year, month, dayofmonth, 0, 0, 0)
     
     // Draw range lines
     if show_range_lines
