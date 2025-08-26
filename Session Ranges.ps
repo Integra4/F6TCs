@@ -68,8 +68,8 @@ clear_old_lines = input.bool(true, "Clear Old Lines", group=g_performance)
 
 // ===== CORE LOGIC =====
 // Define the time range
-start_time = timestamp(timezone, year, month, dayofmonth, effective_start_hour, effective_start_minute, 0)
-end_time = timestamp(timezone, year, month, dayofmonth, effective_end_hour, effective_end_minute, 0)
+start_time = timestamp(syminfo.timezone, year, month, dayofmonth, effective_start_hour, effective_start_minute, 0)
+end_time = timestamp(syminfo.timezone, year, month, dayofmonth, effective_end_hour, effective_end_minute, 0)
 
 // Validate window: end must be after start (no overnight sessions)
 start_minutes = (effective_start_hour * 60) + effective_start_minute
@@ -102,7 +102,7 @@ if dayofmonth != dayofmonth[1]
     
     // Clean up old lines and labels based on max_days_back setting
     if clear_old_lines
-        current_date = timestamp(timezone, year, month, dayofmonth, 0, 0, 0)
+        current_date = timestamp(syminfo.timezone, year, month, dayofmonth, 0, 0, 0)
         
         // Clean up old lines
         if array.size(range_lines) > 0
@@ -153,7 +153,7 @@ if range_completed and not lines_drawn and not na(start_bar_index)
     extend_direction = extend.right
     
     // Get current date for tracking
-    current_line_date = timestamp(timezone, year, month, dayofmonth, 0, 0, 0)
+    current_line_date = timestamp(syminfo.timezone, year, month, dayofmonth, 0, 0, 0)
     
     // Draw range lines
     if show_range_lines
