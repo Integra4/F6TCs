@@ -11,7 +11,7 @@ var string g_time = "Time Settings"
 timezone = input.string("America/New_York", "Timezone", options=["America/New_York", "America/Chicago", "America/Denver", "America/Los_Angeles", "UTC"], group=g_time)
 
 // Session Preset (AM/PM)
-session_mode = input.string("AM", "Session Mode", options=["AM", "PM"], group=g_time)
+session_mode = input.string("AM", "Session Mode", options=["AM", "PM", "Custom"], group=g_time)
 
 // AM Session Window (used when Session Mode = AM)
 am_start_hour = input.int(7, "AM Start Hour (EST)", minval=0, maxval=23, group=g_time)
@@ -25,11 +25,17 @@ pm_start_minute = input.int(30, "PM Start Minute", minval=0, maxval=59, group=g_
 pm_end_hour = input.int(13, "PM End Hour (EST)", minval=0, maxval=23, group=g_time)
 pm_end_minute = input.int(35, "PM End Minute", minval=0, maxval=59, group=g_time)
 
+// Custom Session Window (used when Session Mode = Custom)
+custom_start_hour = input.int(0, "Custom Start Hour", minval=0, maxval=23, group=g_time)
+custom_start_minute = input.int(0, "Custom Start Minute", minval=0, maxval=59, group=g_time)
+custom_end_hour = input.int(0, "Custom End Hour", minval=0, maxval=23, group=g_time)
+custom_end_minute = input.int(30, "Custom End Minute", minval=0, maxval=59, group=g_time)
+
 // Effective window derived from Session Mode
-effective_start_hour = session_mode == "AM" ? am_start_hour : pm_start_hour
-effective_start_minute = session_mode == "AM" ? am_start_minute : pm_start_minute
-effective_end_hour = session_mode == "AM" ? am_end_hour : pm_end_hour
-effective_end_minute = session_mode == "AM" ? am_end_minute : pm_end_minute
+effective_start_hour = session_mode == "AM" ? am_start_hour : session_mode == "PM" ? pm_start_hour : custom_start_hour
+effective_start_minute = session_mode == "AM" ? am_start_minute : session_mode == "PM" ? pm_start_minute : custom_start_minute
+effective_end_hour = session_mode == "AM" ? am_end_hour : session_mode == "PM" ? pm_end_hour : custom_end_hour
+effective_end_minute = session_mode == "AM" ? am_end_minute : session_mode == "PM" ? pm_end_minute : custom_end_minute
 
 // Line Style Settings
 var string g_lines = "Line Style Settings"
@@ -71,8 +77,14 @@ clear_old_lines = input.bool(true, "Clear Old Lines", group=g_performance)
 start_time = timestamp(timezone, year, month, dayofmonth, effective_start_hour, effective_start_minute, 0)
 end_time = timestamp(timezone, year, month, dayofmonth, effective_end_hour, effective_end_minute, 0)
 
+// Adjust for sessions that cross midnight
+start_minutes = effective_start_hour * 60 + effective_start_minute
+end_minutes = effective_end_hour * 60 + effective_end_minute
+wraps_midnight = end_minutes <= start_minutes
+end_time_adj = wraps_midnight ? end_time + 24 * 60 * 60 * 1000 : end_time
+
 // Check if current bar is within the time range
-in_range = time >= start_time and time <= end_time
+in_range = time >= start_time and time < end_time_adj
 
 // Variables to track high and low during the range
 var float range_high = na
@@ -132,8 +144,8 @@ if in_range
     if na(start_bar_index)
         start_bar_index := bar_index
 
-// Mark range as completed after end time
-if time > end_time and not range_completed
+// Mark range as completed at end bar start
+if time >= end_time_adj and not range_completed
     range_completed := true
 
 // Calculate quadrant levels
