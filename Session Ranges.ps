@@ -5,10 +5,6 @@ indicator("session ranges", overlay=true, max_lines_count=500, max_labels_count=
 // General Settings
 var string g_general = "General Settings"
 
-// Time Settings
-var string g_time = "Time Settings"
-timezone = input.string("America/New_York", "Timezone", options=["America/New_York", "America/Chicago", "America/Denver", "America/Los_Angeles", "UTC"], group=g_time)
-
 // Fixed range: 12:00 AM to 12:35 AM (00:00 to 00:35)
 effective_start_hour = 0
 effective_start_minute = 0
@@ -66,9 +62,9 @@ exchange_in_range = not na(time(timeframe.period, session_str))
 exchange_session_started = exchange_in_range and not exchange_in_range[1]
 exchange_session_ended = not exchange_in_range and exchange_in_range[1]
 
-// Timezone-based method (uses selected timezone and handles midnight wrap)
-start_time = timestamp(timezone, year, month, dayofmonth, effective_start_hour, effective_start_minute, 0)
-end_time = timestamp(timezone, year, month, dayofmonth, effective_end_hour, effective_end_minute, 0)
+// Timezone-based method (uses chart time and handles midnight wrap)
+start_time = timestamp(year, month, dayofmonth, effective_start_hour, effective_start_minute, 0)
+end_time = timestamp(year, month, dayofmonth, effective_end_hour, effective_end_minute, 0)
 start_minutes = effective_start_hour * 60 + effective_start_minute
 end_minutes = effective_end_hour * 60 + effective_end_minute
 wraps_midnight = end_minutes <= start_minutes
@@ -105,7 +101,7 @@ if session_started or (not in_range and not in_range[1] and dayofmonth != dayofm
 
     // Clean up old lines and labels based on max_days_back setting
     if clear_old_lines
-        current_date = timestamp(timezone, year, month, dayofmonth, 0, 0, 0)
+        current_date = timestamp(year, month, dayofmonth, 0, 0, 0)
 
         // Clean up old lines
         if array.size(range_lines) > 0
@@ -158,7 +154,7 @@ if range_completed and not lines_drawn and not na(start_bar_index)
     extend_direction = extend.right
     
     // Get current date for tracking
-    current_line_date = timestamp(timezone, year, month, dayofmonth, 0, 0, 0)
+    current_line_date = timestamp(year, month, dayofmonth, 0, 0, 0)
     
     // Draw range lines
     if show_range_lines
