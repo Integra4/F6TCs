@@ -60,6 +60,10 @@ label_size = input.string("small", "Label Size", options=["tiny", "small", "norm
 label_color = input.color(color.white, "Label Color", group=g_display)
 label_style = input.string("label.style_label_down", "Label Style", options=["label.style_label_down", "label.style_label_up", "label.style_label_left", "label.style_label_right"], group=g_display)
 
+// Debug Settings
+var string g_debug = "Debug Settings"
+show_debug = input.bool(false, "Show Debug Flags", group=g_debug)
+
 // Alert Settings
 var string g_alerts = "Alert Settings"
 enable_alerts = input.bool(false, "Enable Alerts", group=g_alerts)
@@ -73,15 +77,32 @@ max_days_back = input.int(30, "Max Days to Display", minval=1, maxval=365, group
 clear_old_lines = input.bool(true, "Clear Old Lines", group=g_performance)
 
 // ===== CORE LOGIC =====
+// Toggle: use exchange session or configured timezone timestamps
+use_exchange_session = input.bool(true, "Use Exchange Session Logic", group=g_time)
+
 // Build session string HHMM-HHMM (works across midnight)
-session_str = str.tostring(effective_start_hour, "00") + str.tostring(effective_start_minute, "00") + "-" + str.tostring(effective_end_hour, "00") + str.tostring(effective_end_minute, "00")
+session_str = str.format("{0,number,00}{1,number,00}-{2,number,00}{3,number,00}", effective_start_hour, effective_start_minute, effective_end_hour, effective_end_minute)
 
-// Determine if current bar is inside the session
-in_range = not na(time(timeframe.period, session_str))
+// Exchange-session method (uses exchange timezone)
+exchange_in_range = not na(time(timeframe.period, session_str))
+exchange_session_started = exchange_in_range and not exchange_in_range[1]
+exchange_session_ended = not exchange_in_range and exchange_in_range[1]
 
-// Detect session boundaries
-session_started = in_range and not in_range[1]
-session_ended = not in_range and in_range[1]
+// Timezone-based method (uses selected timezone and handles midnight wrap)
+start_time = timestamp(timezone, year, month, dayofmonth, effective_start_hour, effective_start_minute, 0)
+end_time = timestamp(timezone, year, month, dayofmonth, effective_end_hour, effective_end_minute, 0)
+start_minutes = effective_start_hour * 60 + effective_start_minute
+end_minutes = effective_end_hour * 60 + effective_end_minute
+wraps_midnight = end_minutes <= start_minutes
+end_time_adj = wraps_midnight ? end_time + 24 * 60 * 60 * 1000 : end_time
+tz_in_range = time >= start_time and time < end_time_adj
+tz_session_started = tz_in_range and not tz_in_range[1]
+tz_session_ended = not tz_in_range and tz_in_range[1]
+
+// Select method
+in_range = use_exchange_session ? exchange_in_range : tz_in_range
+session_started = use_exchange_session ? exchange_session_started : tz_session_started
+session_ended = use_exchange_session ? exchange_session_ended : tz_session_ended
 
 // Variables to track high and low during the range
 var float range_high = na
@@ -231,3 +252,9 @@ if enable_alerts
 // plotchar(days_diff, "Days Difference", "", location.top)
 // plotchar(lines_drawn_date, "Lines Drawn Date", "", location.top)
 // plotchar(current_date, "Current Date", "", location.top)
+
+// Debug flags
+if show_debug
+    plotchar(in_range ? 1 : 0, "in_range", "", location.top)
+    plotchar(session_started ? 1 : 0, "session_started", "", location.top)
+    plotchar(session_ended ? 1 : 0, "session_ended", "", location.top)
