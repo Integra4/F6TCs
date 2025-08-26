@@ -62,8 +62,13 @@ clear_old_lines = input.bool(true, "Clear Old Lines", group=g_performance)
 start_time = timestamp(timezone, year, month, dayofmonth, effective_start_hour, effective_start_minute, 0)
 end_time = timestamp(timezone, year, month, dayofmonth, effective_end_hour, effective_end_minute, 0)
 
+// Validate window: end must be after start (no overnight sessions)
+start_minutes = (effective_start_hour * 60) + effective_start_minute
+end_minutes = (effective_end_hour * 60) + effective_end_minute
+valid_window = end_minutes > start_minutes
+
 // Check if current bar is within the time range
-in_range = time >= start_time and time <= end_time
+in_range = valid_window and time >= start_time and time <= end_time
 
 // Variables to track high and low during the range
 var float range_high = na
@@ -123,8 +128,8 @@ if in_range
     if na(start_bar_index)
         start_bar_index := bar_index
 
-// Mark range as completed after end time
-if time > end_time and not range_completed
+// Mark range as completed after end time (only if window valid)
+if valid_window and time > end_time and not range_completed
     range_completed := true
 
 // Calculate quadrant levels
