@@ -254,7 +254,6 @@ if enable_alerts
 // plotchar(current_date, "Current Date", "", location.top)
 
 // Debug flags
-if show_debug
-    plotchar(in_range ? 1 : 0, "in_range", "", location.top)
-    plotchar(session_started ? 1 : 0, "session_started", "", location.top)
-    plotchar(session_ended ? 1 : 0, "session_ended", "", location.top)
+plotchar(show_debug ? (in_range ? 1 : 0) : na, "in_range", "", location.top)
+plotchar(show_debug ? (session_started ? 1 : 0) : na, "session_started", "", location.top)
+plotchar(show_debug ? (session_ended ? 1 : 0) : na, "session_ended", "", location.top)
