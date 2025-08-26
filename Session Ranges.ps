@@ -73,18 +73,15 @@ max_days_back = input.int(30, "Max Days to Display", minval=1, maxval=365, group
 clear_old_lines = input.bool(true, "Clear Old Lines", group=g_performance)
 
 // ===== CORE LOGIC =====
-// Define the time range
-start_time = timestamp(timezone, year, month, dayofmonth, effective_start_hour, effective_start_minute, 0)
-end_time = timestamp(timezone, year, month, dayofmonth, effective_end_hour, effective_end_minute, 0)
+// Build session string HHMM-HHMM (works across midnight)
+session_str = str.tostring(effective_start_hour, "00") + str.tostring(effective_start_minute, "00") + "-" + str.tostring(effective_end_hour, "00") + str.tostring(effective_end_minute, "00")
 
-// Adjust for sessions that cross midnight
-start_minutes = effective_start_hour * 60 + effective_start_minute
-end_minutes = effective_end_hour * 60 + effective_end_minute
-wraps_midnight = end_minutes <= start_minutes
-end_time_adj = wraps_midnight ? end_time + 24 * 60 * 60 * 1000 : end_time
+// Determine if current bar is inside the session
+in_range = not na(time(timeframe.period, session_str))
 
-// Check if current bar is within the time range
-in_range = time >= start_time and time < end_time_adj
+// Detect session boundaries
+session_started = in_range and not in_range[1]
+session_ended = not in_range and in_range[1]
 
 // Variables to track high and low during the range
 var float range_high = na
@@ -99,53 +96,55 @@ var label[] range_labels = array.new_label()
 var int[] line_dates = array.new_int()
 var int[] label_dates = array.new_int()
 
-// Reset at the start of each day
-if dayofmonth != dayofmonth[1]
+// Reset at the start of each session day (when a new session can begin)
+if session_started or (not in_range and not in_range[1] and dayofmonth != dayofmonth[1])
     range_high := na
     range_low := na
     range_completed := false
     start_bar_index := na
     lines_drawn := false
-    
+
     // Clean up old lines and labels based on max_days_back setting
     if clear_old_lines
         current_date = timestamp(timezone, year, month, dayofmonth, 0, 0, 0)
-        
+
         // Clean up old lines
         if array.size(range_lines) > 0
             for i = array.size(range_lines) - 1 to 0
                 if i < array.size(line_dates)
                     line_date = array.get(line_dates, i)
                     days_diff = math.floor((current_date - line_date) / (1000 * 60 * 60 * 24))
-                    
+
                     if days_diff > max_days_back
                         line.delete(array.get(range_lines, i))
                         array.remove(range_lines, i)
                         array.remove(line_dates, i)
-        
+
         // Clean up old labels
         if array.size(range_labels) > 0
             for i = array.size(range_labels) - 1 to 0
                 if i < array.size(label_dates)
                     label_date = array.get(label_dates, i)
                     days_diff = math.floor((current_date - label_date) / (1000 * 60 * 60 * 24))
-                    
+
                     if days_diff > max_days_back
                         label.delete(array.get(range_labels, i))
                         array.remove(range_labels, i)
                         array.remove(label_dates, i)
 
 // Update high and low during the range
-if in_range
-    if na(range_high) or high > range_high
+if session_started
+    range_high := high
+    range_low := low
+    start_bar_index := bar_index
+else if in_range
+    if high > range_high
         range_high := high
-    if na(range_low) or low < range_low
+    if low < range_low
         range_low := low
-    if na(start_bar_index)
-        start_bar_index := bar_index
 
-// Mark range as completed at end bar start
-if time >= end_time_adj and not range_completed
+// Mark range as completed at end bar
+if session_ended and not range_completed
     range_completed := true
 
 // Calculate quadrant levels
