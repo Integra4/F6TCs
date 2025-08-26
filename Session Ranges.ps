@@ -10,26 +10,17 @@ indicator_name = input.string("Session F6TCs", "Indicator Name", group=g_general
 var string g_time = "Time Settings"
 timezone = input.string("America/New_York", "Timezone", options=["America/New_York", "America/Chicago", "America/Denver", "America/Los_Angeles", "UTC"], group=g_time)
 
-// Session Preset (AM/PM)
-session_mode = input.string("AM", "Session Mode", options=["AM", "PM"], group=g_time)
+// 24-Hour Session Window (no AM/PM toggle)
+session_start_hour = input.int(7, "Session Start Hour (0-23)", minval=0, maxval=23, group=g_time)
+session_start_minute = input.int(30, "Session Start Minute", minval=0, maxval=59, group=g_time)
+session_end_hour = input.int(7, "Session End Hour (0-23)", minval=0, maxval=23, group=g_time)
+session_end_minute = input.int(35, "Session End Minute", minval=0, maxval=59, group=g_time)
 
-// AM Session Window (used when Session Mode = AM)
-am_start_hour = input.int(7, "AM Start Hour (EST)", minval=0, maxval=23, group=g_time)
-am_start_minute = input.int(30, "AM Start Minute", minval=0, maxval=59, group=g_time)
-am_end_hour = input.int(7, "AM End Hour (EST)", minval=0, maxval=23, group=g_time)
-am_end_minute = input.int(35, "AM End Minute", minval=0, maxval=59, group=g_time)
-
-// PM Session Window (used when Session Mode = PM)
-pm_start_hour = input.int(13, "PM Start Hour (EST)", minval=0, maxval=23, group=g_time)
-pm_start_minute = input.int(30, "PM Start Minute", minval=0, maxval=59, group=g_time)
-pm_end_hour = input.int(13, "PM End Hour (EST)", minval=0, maxval=23, group=g_time)
-pm_end_minute = input.int(35, "PM End Minute", minval=0, maxval=59, group=g_time)
-
-// Effective window derived from Session Mode
-effective_start_hour = session_mode == "AM" ? am_start_hour : pm_start_hour
-effective_start_minute = session_mode == "AM" ? am_start_minute : pm_start_minute
-effective_end_hour = session_mode == "AM" ? am_end_hour : pm_end_hour
-effective_end_minute = session_mode == "AM" ? am_end_minute : pm_end_minute
+// Effective window derived from 24-hour inputs
+effective_start_hour = session_start_hour
+effective_start_minute = session_start_minute
+effective_end_hour = session_end_hour
+effective_end_minute = session_end_minute
 
 // Line Style Settings
 var string g_lines = "Line Style Settings"
