@@ -137,8 +137,8 @@ if in_range
     if na(start_bar_index)
         start_bar_index := bar_index
 
-// Mark range as completed after end time (only if window valid)
-if valid_window and time > end_time and not range_completed
+// Mark range as completed after end time (only if window valid and range observed)
+if valid_window and time > end_time and not range_completed and not na(range_high) and not na(range_low)
     range_completed := true
 
 // Calculate quadrant levels
@@ -148,7 +148,7 @@ q50 = range_low + (range_size * 0.50)
 q75 = range_low + (range_size * 0.75)
 
 // Draw horizontal rays starting from start time and extending to the right
-if range_completed and not lines_drawn and not na(start_bar_index)
+if range_completed and not lines_drawn and not na(start_bar_index) and not na(range_high) and not na(range_low)
     // Always use extend.right for proper behavior
     extend_direction = extend.right
     
